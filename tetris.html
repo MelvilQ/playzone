@@ -1,0 +1,413 @@
+<head><title>Tetris</title></head>
+
+<body style="background-color: black; text-align: center">
+
+<canvas width="500" height="500" id="gameCanvas" style="position: absolute; top: 50%; left: 50%; margin: -250px 0 0 -250px;"></canvas>
+
+<script>
+
+window.onload = function(){
+	initModel();
+	initScreen();
+}
+
+function update(){
+	frame += 1;
+	updateModel();
+	updateScreen();
+}
+
+function initModel(){
+	grid = [
+		[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+		[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+		[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+		[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+		[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+		[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+		[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+		[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+		[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+		[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]
+	];
+	blocks = {
+		"I": [
+			[{x:0,y:1},{x:1,y:1},{x:2,y:1},{x:3,y:1}],
+			[{x:2,y:0},{x:2,y:1},{x:2,y:2},{x:2,y:3}],
+			[{x:0,y:1},{x:1,y:1},{x:2,y:1},{x:3,y:1}],
+			[{x:2,y:0},{x:2,y:1},{x:2,y:2},{x:2,y:3}]
+		],
+		"O": [
+			[{x:1,y:0},{x:1,y:1},{x:2,y:0},{x:2,y:1}],
+			[{x:1,y:0},{x:1,y:1},{x:2,y:0},{x:2,y:1}],
+			[{x:1,y:0},{x:1,y:1},{x:2,y:0},{x:2,y:1}],
+			[{x:1,y:0},{x:1,y:1},{x:2,y:0},{x:2,y:1}]
+		],
+		"T": [
+			[{x:1,y:1},{x:2,y:1},{x:2,y:2},{x:3,y:1}],
+			[{x:2,y:0},{x:1,y:1},{x:2,y:1},{x:2,y:2}],
+			[{x:1,y:2},{x:2,y:1},{x:2,y:2},{x:3,y:2}],
+			[{x:2,y:0},{x:2,y:1},{x:3,y:1},{x:2,y:2}]
+		],
+		"S": [
+			[{x:1,y:2},{x:2,y:1},{x:2,y:2},{x:3,y:1}],
+			[{x:1,y:0},{x:1,y:1},{x:2,y:1},{x:2,y:2}],
+			[{x:1,y:2},{x:2,y:1},{x:2,y:2},{x:3,y:1}],
+			[{x:1,y:0},{x:1,y:1},{x:2,y:1},{x:2,y:2}]
+		],
+		"Z": [
+			[{x:1,y:1},{x:2,y:1},{x:2,y:2},{x:3,y:2}],
+			[{x:3,y:0},{x:3,y:1},{x:2,y:1},{x:2,y:2}],
+			[{x:1,y:1},{x:2,y:1},{x:2,y:2},{x:3,y:2}],
+			[{x:3,y:0},{x:3,y:1},{x:2,y:1},{x:2,y:2}]
+		],
+		"J": [
+			[{x:1,y:1},{x:2,y:1},{x:3,y:1},{x:3,y:2}],
+			[{x:2,y:0},{x:2,y:1},{x:2,y:2},{x:1,y:2}],
+			[{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:1,y:1}],
+			[{x:2,y:0},{x:3,y:0},{x:2,y:1},{x:2,y:2}]
+		],
+		"L": [
+			[{x:1,y:1},{x:1,y:2},{x:2,y:1},{x:3,y:1}],
+			[{x:2,y:0},{x:2,y:1},{x:2,y:2},{x:1,y:0}],
+			[{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:3,y:1}],
+			[{x:2,y:0},{x:2,y:1},{x:2,y:2},{x:3,y:2}]
+		]
+	};
+	blockTypes = Object.keys(blocks);
+	colors = ["pink","lightgreen","green","cyan","chocolate"];
+	lineMarkColor = "white";
+
+	activeBlock = {type: randomArrayItem(blockTypes), color: randomArrayItem(colors), x: 3, y: 0, turn: 0};
+	nextBlock = {type: randomArrayItem(blockTypes), color: randomArrayItem(colors), x: 3, y: 0, turn: 0};
+	nextNextBlock = {type: randomArrayItem(blockTypes), color: randomArrayItem(colors), x: 3, y: 0, turn: 0};
+
+	level = 1;
+	score = 0;
+	levelmeter = 0;
+	gameOver = false;
+
+	frame = 0;
+	nextDown = 60;
+	showCompletedRows = 0;
+	curb = 0;
+
+	record = 0;
+	try {
+		record = parseInt(localStorage.getItem('record'));
+	} catch {}
+	
+	isNewRecord = false;
+
+	resetKeyStates();
+}
+
+function initScreen(){
+	canvas = document.getElementById("gameCanvas");
+	context = canvas.getContext("2d");
+	window.addEventListener('keydown', handleKeyDown);
+	window.addEventListener('keyup', handleKeyUp);
+	canvas.addEventListener('click', handleClick);
+	setInterval(update, 1000/30);
+}
+
+function handleKeyDown(e){
+	if(e.keyCode == 65){
+		turnForward = true;
+	} else if (e.keyCode == 83){
+		turnBackward = true;
+	} else if(e.keyCode == 37){
+		moveLeft = true;
+	} else if(e.keyCode == 39){
+		moveRight = true;
+	} else if(e.keyCode == 40){
+		moveDown = true;
+	}
+}
+
+function handleKeyUp(e){
+	if(e.keyCode == 40){
+		curb = 0;
+	}
+}
+
+function handleClick(){
+	if(gameOver){
+		initModel();
+	}
+}
+
+function updateModel(){
+	if(gameOver)
+		return;
+	if(curb > 0)
+		curb -= 1;
+	if(showCompletedRows > 0){
+		showCompletedRows -= 1;
+		if(showCompletedRows == 0){
+			rows = removeCompletedRows();
+			addScore(rows);
+			nextDown = frame + ~~(60/level) + 20;
+		}
+		return;
+	}
+	// natural down
+	if(curb == 0 && moveDown && !activeBlockTouchesGround()){
+		score += 1;
+		activeBlock.y += 1;
+		nextDown = frame + ~~(60/level);
+	}
+	// forced down
+	else if(frame == nextDown && !activeBlockTouchesGround()){
+		activeBlock.y += 1;
+		nextDown = frame + ~~(60/level);
+	}
+	// snapping in
+	else if((curb == 0 && moveDown || frame == nextDown) && activeBlockTouchesGround()){
+		blocks[activeBlock.type][activeBlock.turn].forEach(function(b){
+			grid[b.x+activeBlock.x][b.y+activeBlock.y] = activeBlock.color;
+		});
+		levelmeter += 7;
+		if(isGameOver()){	// check game over
+			gameOver = true;
+			if(score > record){
+				try {
+					localStorage.setItem("record", score);
+				} catch {}
+				isNewRecord = true;
+			}
+		} else {
+			activeBlock = nextBlock;
+			nextBlock = nextNextBlock;
+			nextNextBlock = {type: randomArrayItem(blockTypes), color: randomArrayItem(colors), x: 3, y: 0, turn: 0};
+			nextDown = frame + ~~(60/level) + 20;
+			curb = 17;
+		}
+		// check rows
+		markCompletedRows();
+	}
+	// move left
+	if(moveLeft && moveLeftIsPossible())
+		activeBlock.x -= 1;
+	// move right
+	if(moveRight && moveRightIsPossible())
+		activeBlock.x += 1;
+	// turn forwards
+	if(turnForward && turnForwardIsPossible())
+		activeBlock.turn = (activeBlock.turn+1)%4;
+	// turn backwards
+	if(turnBackward && turnBackwardIsPossible())
+		activeBlock.turn = (activeBlock.turn+3)%4;
+	// check levelmeter
+	if(levelmeter > 490){
+		level += 1;
+		levelmeter = 0;
+	}
+	// reset key states
+	resetKeyStates();
+}
+
+function updateScreen(){
+	// draw background
+	context.fillStyle = "#262626";
+	context.fillRect(0, 0, canvas.width, canvas.height);
+	context.strokeStyle = "gold";
+	context.lineWidth = 10;
+	context.strokeRect(5, -5, 310, 500);
+	// draw levelmeter
+	context.fillStyle = "firebrick";
+	context.fillRect(0, 490-levelmeter, 10, 10);
+	context.fillRect(310, 490-levelmeter, 10, 10);
+	// draw grid
+	for(x=0; x<10; ++x){
+		for(y=0; y<16; ++y){
+			if(grid[x][y] != null){
+				context.fillStyle = grid[x][y];
+				context.fillRect(30*x+10,30*y+10, 30, 30);
+			}
+		}
+	}
+	// draw active block
+	if(showCompletedRows == 0){
+		context.fillStyle = activeBlock.color;
+		blocks[activeBlock.type][activeBlock.turn].forEach(function(b){
+			context.fillRect(30*(b.x+activeBlock.x)+10, 30*(b.y+activeBlock.y)+10, 30, 30);
+		});
+	}
+	// draw next blocks
+	context.strokeStyle = "white";
+	context.lineWidth = 3;
+	context.strokeRect(330, 20, 150, 100);
+	context.fillStyle = nextBlock.color;
+	blocks[nextBlock.type][nextBlock.turn].forEach(function(b){
+		context.fillRect(20*b.x + 335, 20*b.y + 30, 20, 20);
+	});
+	context.fillStyle = nextNextBlock.color;
+	blocks[nextNextBlock.type][nextNextBlock.turn].forEach(function(b){
+		context.fillRect(10*b.x + 425, 10*b.y + 50, 10, 10);
+	});
+	// draw score
+	context.font = "18px Courier";
+	context.fillStyle = "white";
+	context.fillText("Level:     " + level.pad(3), 330, 170);
+	context.fillText("Score: " + score.pad(7), 330, 200);
+	context.fillText("  Max: " + record.pad(7), 330, 480);
+	// draw game over text and let dead-causing block blink
+	if(gameOver){
+		if(~~(frame/10) % 2 == 1){
+			context.fillStyle = nextBlock.color;
+			blocks[nextBlock.type][nextBlock.turn].forEach(function(b){
+				context.fillRect(30*(b.x+nextBlock.x)+10, 30*(b.y+nextBlock.y)+10, 30, 30);
+			});
+		}
+		context.font = "60px Courier";
+		context.fillStyle = "red";
+		context.fillText("GAME OVER", 90, 270);
+		context.font = "30px Courier";
+		context.fillText("Click to restart", 110, 310);
+		if(isNewRecord){
+			context.font = "60px Courier";
+			context.fillStyle = "blue";
+			context.fillText("NEW RECORD!", 65, 180);
+		}
+	}
+}
+
+function isPossibleBlockPosition(bx, by){
+	return !(bx < 0 || bx >= 10 || by < 0 || by >= 16 || grid[bx][by] != null)
+}
+
+function activeBlockTouchesGround(){
+	touching = false;
+	blocks[activeBlock.type][activeBlock.turn].forEach(function(b){
+		if(!isPossibleBlockPosition(b.x+activeBlock.x, b.y+activeBlock.y+1))
+			touching = true;
+	});
+	return touching;
+}
+
+function moveLeftIsPossible(){
+	possible = true;
+	blocks[activeBlock.type][activeBlock.turn].forEach(function(b){
+		if(!isPossibleBlockPosition(b.x+activeBlock.x-1, b.y+activeBlock.y))
+			possible = false;
+	});
+	return possible;
+}
+
+function moveRightIsPossible(){
+	possible = true;
+	blocks[activeBlock.type][activeBlock.turn].forEach(function(b){
+		if(!isPossibleBlockPosition(b.x+activeBlock.x+1, b.y+activeBlock.y))
+			possible = false;
+	});
+	return possible;
+}
+
+function turnForwardIsPossible(){
+	possible = true;
+	blocks[activeBlock.type][(activeBlock.turn+1)%4].forEach(function(b){
+		if(!isPossibleBlockPosition(b.x+activeBlock.x, b.y+activeBlock.y))
+			possible = false;
+	});
+	return possible;
+}
+
+function turnBackwardIsPossible(){
+	possible = true;
+	blocks[activeBlock.type][(activeBlock.turn+3)%4].forEach(function(b){
+		if(!isPossibleBlockPosition(b.x+activeBlock.x, b.y+activeBlock.y))
+			possible = false;
+	});
+	return possible;
+}
+
+function markCompletedRows(){
+	for(y=0; y<16; ++y){
+		complete = true;
+		for(x=0; x<10; ++x){
+			if(grid[x][y] == null)
+				complete = false;
+		}
+		if(complete){
+			showCompletedRows = 8;
+			for(x=0; x<10; ++x){
+				grid[x][y] = lineMarkColor;
+			}
+		}
+	}
+}
+
+function removeCompletedRows(){
+	rows = 0;
+	for(y=0; y<16; ++y){
+		if(grid[0][y] == lineMarkColor){
+			rows++;
+			// move down everything above this row
+			for(x=0; x<10; ++x){
+				for(y2=y; y2>=0; y2--){
+					if(y2 > 0)
+						grid[x][y2] = grid[x][y2-1]
+					else
+						grid[x][y2] = null;
+				}
+			}
+		}
+	}
+	return rows;
+}
+
+function addScore(rows){
+	// add points
+	if(rows == 1)
+		score += level*100;
+	else if(rows == 2)
+		score += level*400;
+	else if(rows == 3)
+		score += level*800;
+	else if(rows == 4)
+		score += level*1600;
+	// add levelmeter
+	levelmeter += 79;
+}
+
+function isGameOver(){
+	dead = false;
+	blocks[nextBlock.type][nextBlock.turn].forEach(function(b){
+		if(!isPossibleBlockPosition(b.x+nextBlock.x, b.y+nextBlock.y))
+			dead = true;
+	});
+	return dead;
+}
+
+function resetKeyStates(){
+	turnForward = false;
+	turnBackward = false;
+	moveLeft = false;
+	moveRight = false;
+	moveDown = false;
+}
+
+function randomIntBetween(start, end){
+	return Math.floor(Math.random()*(end-start+1)) + start;
+}
+
+function randomArrayItem(items){
+	return items[Math.floor(Math.random()*items.length)];
+}
+
+function cloneObject(obj){
+	return JSON.parse(JSON.stringify(obj)); // see http://stackoverflow.com/questions/122102/what-is-the-most-efficient-way-to-deep-clone-an-object-in-javascript
+}
+
+Number.prototype.pad = function(size) {	// see http://stackoverflow.com/questions/2998784/how-to-output-integers-with-leading-zeros-in-javascript
+	var s = String(this);
+    while (s.length < (size || 2)) {s = "0" + s;}
+    return s;
+}
+
+</script>
+
+<div style="color: white; font-family: courier; font-size: 20px">Use arrow keys to play. Turn blocks with A and S.</div>
+
+</body>

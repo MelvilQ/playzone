@@ -1,0 +1,232 @@
+<html>
+
+<head>
+	<title>Minesweeper</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<style>
+		body {
+			font-family: sans-serif;
+			text-align: center;
+		}
+
+		table {
+			margin: 0 auto;
+		}
+
+		td {
+			width: 25px;
+			height: 25px;
+			border: none;
+			text-align: center;
+		}
+
+		input[type="text"] {
+			width: 40px;
+		}
+
+		.closed {
+			background-color: black;
+		}
+
+		.closed:hover {
+			background-color: gray;
+		}
+
+		.closed:active {
+			background-color: white;
+		}
+
+		.opened {
+			background-color: lightgray;
+		}
+
+		.marked {
+			color: red;
+		}
+
+		.mined {
+			background-color: coral;
+		}
+
+		.lost {
+			color: red;
+		}
+
+		.won {
+			color: green;
+		}
+	</style>
+	<script src="https://unpkg.com/vue@2.5.16/dist/vue.js"></script>
+</head>
+
+<body>
+
+	<div id="app">
+		<h2>Minesweeper</h2>
+		<div>
+			Number of Mines:
+			<input type="text" v-model.number="numMines">
+			<br> Field Size:
+			<input type="text" v-model.number="gridSize">
+			<br>
+			<br>
+			<button @click="newGame()">New Game</button>
+			<span>{{gameTime}}</span>
+			<br>
+			<br>
+		</div>
+		<table>
+			<tr v-for="i in currentGridSize">
+				<td v-for="cell in cellsByRow(i-1)" :class="{closed: !cell.opened, opened: cell.opened, mined: cell.opened && cell.mine}"
+				 @click="openCell(cell)" @click.right.prevent="markCell(cell)">
+					<span v-if="cell.opened && !cell.mine && cell.neighbors !== 0">{{cell.neighbors}}</span>
+					<span v-if="cell.mine && cell.opened" :class="{marked: cell.exploded}">X</span>
+					<span v-if="cell.marked && !cell.opened" class="marked">X</span>
+				</td>
+			</tr>
+		</table>
+		<div>
+			<br>
+			<span class="lost" v-if="isLost">You lost!</span>
+			<span class="won" v-if="isWon">You won! Congrats!</span>
+		</div>
+	</div>
+
+	<script>
+
+		function randomInt(min, max) {
+			return Math.floor(Math.random() * (max - min)) + min;
+		}
+
+		function formatTime(t) {
+			var minutes = Math.floor(t / 60000.0);
+			var seconds = Math.floor((t % 60000.0) / 1000.0);
+			var decimals = Math.floor((t % 1000.0) / 100.0);
+			return (minutes + ':' + ((seconds < 10) ? '0' : '') + seconds + '.' + decimals);
+		}
+
+		Array.prototype.count = function (f) {
+			return this.reduce((sum, x) => f(x) ? sum + 1 : sum, 0);
+		}
+
+		var app = new Vue({
+			el: '#app',
+			data: {
+				cells: [],
+				numMines: 10,
+				currentNumMines: 0,
+				gridSize: 10,
+				currentGridSize: 0,
+				isLost: false,
+				startTime: 0,
+				endTime: 0
+			},
+			computed: {
+				isWon: function () {
+					return this.cells.count(cell => !cell.opened && !cell.mine) === 0;
+				},
+				gameTime: function () {
+					return formatTime(this.endTime - this.startTime);
+				}
+			},
+			methods: {
+				cellsByRow: function (row) {
+					return this.cells.filter(cell => cell.y === row).sort((cell1, cell2) => cell1.x > cell2.x ? 1 : -1);
+				},
+				newGame: function () {
+					this.isLost = false;
+					this.currentGridSize = this.gridSize;
+					this.currentNumMines = this.numMines;
+					this.startTime = new Date().getTime();
+					// prepare grid
+					this.cells = [];
+					for (let row = 0; row < this.currentGridSize; row++) {
+						for (let col = 0; col < this.currentGridSize; col++) {
+							this.cells.push({ x: col, y: row, opened: false, mine: false, neighbors: 0, marked: false, exploded: false });
+						}
+					}
+					// set mines
+					let set = 0;
+					while (set < this.numMines) {
+						let x = randomInt(0, this.currentGridSize);
+						let y = randomInt(0, this.currentGridSize);
+						let cell = this.cells.find(cell => cell.x === x && cell.y === y);
+						if (cell.mine) {
+							continue;
+						}
+						cell.mine = true;
+						++set;
+					}
+					// set neighbors
+					for (let row = 0; row < this.currentGridSize; row++) {
+						for (let col = 0; col < this.currentGridSize; col++) {
+							let numNeighbors = this.cells
+								.filter(cell => Math.abs(col - cell.x) <= 1 && Math.abs(row - cell.y) <= 1)
+								.count(cell => cell.mine);
+							this.cells.find(cell => cell.x === col && cell.y === row).neighbors = numNeighbors;
+						}
+					}
+				},
+				openCell: function (cell) {
+					if (cell.opened || this.isLost || this.isWon) {
+						return;
+					}
+					cell.opened = true;
+					if (cell.mine) {
+						cell.exploded = true;
+						this.gameOver();
+						return;
+					}
+					if (cell.neighbors) {
+						return;
+					}
+					if (cell.x > 0) {
+						this.openCellAt(cell.x - 1, cell.y);
+					}
+					if (cell.y > 0) {
+						this.openCellAt(cell.x, cell.y - 1);
+					}
+					if (cell.x < this.currentGridSize - 1) {
+						this.openCellAt(cell.x + 1, cell.y);
+					}
+					if (cell.y < this.currentGridSize - 1) {
+						this.openCellAt(cell.x, cell.y + 1);
+					}
+					if (cell.x > 0 && cell.y > 0) {
+						this.openCellAt(cell.x - 1, cell.y - 1);
+					}
+					if (cell.x > 0 && cell.y < this.currentGridSize - 1) {
+						this.openCellAt(cell.x - 1, cell.y + 1);
+					}
+					if (cell.x < this.currentGridSize - 1 && cell.y > 0) {
+						this.openCellAt(cell.x + 1, cell.y - 1);
+					}
+					if (cell.x < this.currentGridSize - 1 && cell.y < this.currentGridSize - 1) {
+						this.openCellAt(cell.x + 1, cell.y + 1);
+					}
+				},
+				openCellAt: function (x, y) {
+					this.openCell(this.cells.find(cell => cell.x === x && cell.y === y));
+				},
+				markCell: function (cell) {
+					cell.marked = !cell.marked;
+				},
+				gameOver: function () {
+					this.isLost = true;
+					this.cells.filter(cell => cell.mine).forEach(cell => { cell.opened = true; });
+				}
+			},
+			created: function () {
+				this.newGame();
+				setInterval(() => {
+					if (!this.isLost && !this.isWon) {
+						this.endTime = new Date().getTime();
+					}
+				}, 100);
+			}
+		});
+	</script>
+</body>
+
+</html>

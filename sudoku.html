@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  
+<title>Sudoku</title>
+<meta charset="utf-8"> 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css?family=Open+Sans:400,700&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.11"></script>
+<script src="sudoku.js"></script>
+
+<style>
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Open Sans', 'Segoe UI', sans-serif;
+  font-size: 16pt;
+  user-select: none;
+}
+
+[v-cloak] {
+  display: none !important;
+}
+
+#vue {
+  display: flex;
+  flex-direction: column;
+}
+
+.progress-bar-container {
+  background: lightblue;
+}
+
+.progress-bar {
+  height: 10px;
+  background: navy;
+}
+
+.progress-bar.fini {
+  background: green;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+}
+
+.board-container {
+  box-sizing: border-box;
+  width: 100vmin;
+  height: 100vmin;
+  padding: 10px;
+}
+
+.board {  
+  background-color: black;
+  padding: 3px;
+  gap: 2px;
+}
+
+.group {
+  gap: 1px;
+}
+
+.cell {
+  background: white;
+  height: calc((100vmin - 20px) / 9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.selected {
+  background: lightyellow;
+}
+
+.given {
+  font-weight: bold;
+}
+
+.wrong {
+  color: red;
+}
+
+.fini:not(.given) {
+  color: green;
+}
+
+.palette-container {
+  margin: 10px;
+  margin-top: 30px;
+}
+
+.palette {
+  background: black;
+  padding: 3px;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 1px;
+}
+
+.palette-button {
+  background: white;
+  height: calc((100vmin - 20px) / 9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.palette-button.selected {
+  background: lightgray;
+}
+
+.button-line {
+  margin: 10px;
+  margin-top: 30px;
+  text-align: center;
+}
+
+</style>
+</head>
+
+<body>
+<div id="vue" v-cloak>
+  <div class="progress-container">
+    <div class="progress-bar" :class="{fini: fini}" :style="{width: progress}"></div>
+  </div>
+  <div class="board-container">
+    <div class="grid board">
+      <div v-for="(_,i) in 9" class="grid group">
+        <div v-for="(_,j) in 9" class="cell" 
+          :class="{selected: cell[i][j] === selectedCell, given: cell[i][j].given, wrong: cell[i][j].wrong, fini: fini}"
+          @click="select(i,j)">
+          <span>{{cell[i][j].content}}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div v-if="!fini && !!selectedCell" class="palette-container">
+    <div class="palette">
+      <div v-for="i in 9" class="palette-button" :class="{selected: selectedCell.content === i}" @click="write(i)">
+        <span>{{i}}</span>
+      </div>
+    </div>
+  </div>
+  <div class="button-line">
+    <button v-if="!fini && selectedCell.wrong" @click="write('')">CLEAR</button>
+    <button v-if="fini" @click="startGame()">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+
+function create9x9Array() {
+  const array = [[],[],[],[],[],[],[],[],[]];
+  array.forEach(a => {
+    for (i = 0; i < 9; ++i) {
+      a[i]= {content: '', given: false, wrong: false};
+    }
+  });
+  return array;
+}
+
+function kFromIj(i, j) {
+  const ix = i % 3;
+  const iy = (i - ix) / 3;
+  const jx = j % 3;
+  const jy = (j - jx) / 3;
+  const ki = ix + 9*iy;
+  const kj = jx + 9*jy;
+  return 3*ki + kj;
+}
+
+const vue = new Vue({
+  el: '#vue',
+  data: {
+    cell: create9x9Array(),
+    selectedCell: {},
+  },
+  computed: {
+    progress() {
+      const cells = this.cell.flat();
+      const all = cells.filter(cell => cell.solution > 0).length;
+      const filled = cells.filter(cell => cell.solution > 0 && cell.content === cell.solution).length;
+      const progress = (100 * filled / all).toFixed(1);
+      return `${progress}%`;
+    },
+    fini() {
+      return this.cell.flat().every(cell => cell.content > 0 && !cell.wrong);
+    }
+  },
+  methods: {
+    startGame() {
+      this.cell = create9x9Array();
+      this.selectedCell = null;
+      const sudoku = SudokuGenerator.getSudoku('easy');
+      const puzzle = Array.from(sudoku.puzzle).map(x => x === '-' ? 0 : parseInt(x, 10));
+      const solution = Array.from(sudoku.solution).map(x => parseInt(x, 10));
+      for (let i = 0; i < 9; ++i) {
+        for (let j = 0; j < 9; ++j) {
+          const k = kFromIj(i, j);
+          const cell = this.cell[i][j];
+          cell.k = k;
+          if (puzzle[k] > 0) {
+            cell.content = puzzle[k];
+            cell.given = true;
+          } else {
+            cell.solution = solution[k];
+            if (!this.selectedCell) {
+              this.selectedCell = cell;
+            }
+          }
+        }
+      }
+    },
+    select(i, j) {
+      if (!this.cell[i][j].given && this.cell[i][j].content !== this.cell[i][j].solution) {
+        this.selectedCell = this.cell[i][j];
+      }
+    },
+    write(n) {
+      this.selectedCell.content = n;
+      this.selectedCell.wrong = this.selectedCell.content > 0 && this.selectedCell.solution !== n;
+    }
+  },
+  created() {
+    this.startGame();
+  }
+});
+
+</script>
+</body>
+</html>
